@@ -200,6 +200,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}
 .choice input:focus-visible + label{outline:2px solid var(--gold);outline-offset:2px}
 .form-foot{text-align:center;margin-top:26px}
 .form-err{margin-top:14px;color:var(--orange);font-size:16px;font-style:italic;min-height:1em}
+.form-err a{color:var(--cocoa);font-weight:600}
 .btn[disabled]{opacity:.6;cursor:wait}
 .thanks{display:none;padding:30px 10px}
 .thanks.show{display:block;animation:fadeUp 1s var(--ease)}
@@ -517,13 +518,20 @@ rsvp.addEventListener('submit', async e => {
   const btn = document.getElementById('rsvpBtn'), err = document.getElementById('rsvpErr');
   btn.disabled = true; btn.textContent = 'Sending…'; err.textContent = '';
   try {
-    const res = await fetch(RSVP_ENDPOINT, {method:'POST', body:new FormData(rsvp), headers:{'Accept':'application/json'}});
-    if (!res.ok) throw new Error('send failed');
+    const fd = new FormData(rsvp);
+    // unique subject per guest, so Gmail does not fold every RSVP into one thread
+    fd.set('_subject', `RSVP: ${fd.get('name')} – ${fd.get('attending')} (${fd.get('guests')}) · Leslie & Barbara`);
+    const res = await fetch(RSVP_ENDPOINT, {method:'POST', body:fd, headers:{'Accept':'application/json'}});
+    const data = await res.json().catch(() => ({}));
+    // FormSubmit can answer 200 with success:"false" (e.g. form not activated), so check the body too
+    if (!res.ok || String(data.success) !== 'true') throw new Error(data.message || 'send failed');
     rsvp.style.display = 'none';
     document.getElementById('thanks').classList.add('show');
   } catch (x) {
-    err.textContent = 'Sorry, your response did not go through. Please try again, or call or WhatsApp us below.';
-    btn.disabled = false; btn.textContent = 'Send my response';
+    const f = new FormData(rsvp);
+    const msg = `Hello, RSVP for Leslie & Barbara's wedding:\nName: ${f.get('name')}\nPhone: ${f.get('phone')}\n${f.get('attending')}\nNumber attending: ${f.get('guests')}` + (f.get('note') ? `\nNote: ${f.get('note')}` : '');
+    err.innerHTML = 'Sorry, your response did not go through. <a href="https://wa.me/233559538156?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">Send it on WhatsApp instead</a>.';
+    btn.disabled = false; btn.textContent = 'Try again';
   }
 });
 
